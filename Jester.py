@@ -31,7 +31,7 @@ jr = Bot(API_TOKEN_JR, loop=loop)
 storage = MemoryStorage()
 jp = Dispatcher(jr, storage=storage)
 jester_user = 'jester_day_bot'
-jester_id = loop.create_task(jr.get_me())
+jester_id = loop.run_until_complete(jr.get_me())
 jester_id = jester_id.id
 
 developers = [879343317]
