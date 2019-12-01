@@ -1,1 +1,1 @@
-web: python Jester.py
+bot: python Jester.py
