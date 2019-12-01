@@ -31,9 +31,10 @@ jr = Bot(API_TOKEN_JR, loop=loop)
 storage = MemoryStorage()
 jp = Dispatcher(jr, storage=storage)
 jester_user = 'jester_day_bot'
-jester_id = 809900920
+jester_id = loop.create_task(jr.get_me())
+jester_id = jester_id.id
 
-developers = [500238135]
+developers = [879343317]
 team = {'main_developer': {'dr_forse': 'George Forse'},
         'testers': [{'dr_forse': 'George Forse'}, {'P1von': 'ApelsinkaS'}, {'kelerne': 'Рин'},
                     {'P0LUNIN': 'polunin.ai'}, {'gbball': 'Брит'}],
@@ -214,16 +215,22 @@ async def show_help(message):
 @jp.message_handler(commands=['players'])
 async def players_list(m):
     try:
-        if collection2.find_one({'group': m.chat.id}) is not None:
-            players = ''
-            for gamer in collection2.find_one({'group': m.chat.id})['players']:
-                if gamer is not None:
-                    player = await jr.get_chat_member(m.chat.id, gamer)
-                    player = player.user.first_name
-                    players += str(player) + ', '
-            x = len(players) - 2
-            players = players[:x]
-            await jr.send_message(m.chat.id, players, reply_to_message_id=m.message_id)
+        if collection2.find_one({'group': m.chat.id}) is None:
+            return
+        players = ''
+        for gamer in collection2.find_one({'group': m.chat.id})['players']:
+            if not gamer:
+                continue
+            try:
+                player = await jr.get_chat_member(m.chat.id, gamer)
+                player = player.user.first_name
+                players += str(player) + ', '
+            except exceptions.InvalidUserId:
+                collection2.update_one({'group': m.chat.id},
+                                       {'$pull': {'players': gamer}})
+        x = len(players) - 2
+        players = players[:x]
+        await jr.send_message(m.chat.id, players, reply_to_message_id=m.message_id)
     except exceptions.MessageTextIsEmpty:
         await jr.send_message(m.chat.id, "Пока никто не играет, нажмите /reg_me для регистрации.")
     except:
@@ -392,9 +399,19 @@ async def get_users(message):
                     jester = random.choice(list_users)
                 while king == boyar or king == jester:
                     king = random.choice(list_users)
-            member = await jr.get_chat_member(message.chat.id, boyar)
+            try:
+                member = await jr.get_chat_member(message.chat.id, boyar)
+            except exceptions.InvalidUserId:
+                collection2.update_one({'group': message.chat.id},
+                                       {'$pull': {'players': boyar}})
+                await get_users(message)
             boyar_name = member.user.first_name
-            member = await jr.get_chat_member(message.chat.id, jester)
+            try:
+                member = await jr.get_chat_member(message.chat.id, jester)
+            except exceptions.InvalidUserId:
+                collection2.update_one({'group': message.chat.id},
+                                       {'$pull': {'players': jester}})
+                await get_users(message)
             jester_name = member.user.first_name
             to_mission = types.InlineKeyboardMarkup()
             butt = types.InlineKeyboardButton('{}, придумывай задание и жми сюда'.format(boyar_name),
@@ -444,8 +461,11 @@ async def get_users(message):
                                            {'$pull': {'players': king}})
                     col_private.update_one({'user': king},
                                            {'$pull': {'groups': message.chat.id}})
-                    king = await jr.get_chat_member(message.chat.id, king)
-                    king = king.user.first_name
+                    try:
+                        king = await jr.get_chat_member(message.chat.id, king)
+                        king = king.user.first_name
+                    except exceptions.InvalidUserId:
+                        pass
                     await jr.send_message(message.chat.id, f'Король не пишет мне в лс! Игра была сброшена, {king} был удален из игры')
             except exceptions.UserDeactivated:
                 await reset_game_command(message)
@@ -460,8 +480,11 @@ async def get_users(message):
                 await jr.send_message(message.chat.id, 'Король мертв. Игра сброшена в начальную стадию. \n/today_user')
         elif doc['status'] == '1':
             boyar = doc['boyar']
-            boyar_name = await jr.get_chat_member(message.chat.id, boyar)
-            boyar_name = boyar_name.user.first_name
+            try:
+                boyar_name = await jr.get_chat_member(message.chat.id, boyar)
+                boyar_name = boyar_name.user.first_name
+            except exceptions.InvalidUserId:
+                pass
             kb = types.InlineKeyboardMarkup()
             butt = types.InlineKeyboardButton('{}, придумывай задание и жми сюда'.format(boyar_name),
                                               url='https://telegram.me/{}?start={}'.format(jester_user,
@@ -472,8 +495,11 @@ async def get_users(message):
                                       boyar, boyar_name), parse_mode='html', reply_markup=kb)
         elif doc['status'] == '2':
             jester = doc['jester']
-            jester_name = await jr.get_chat_member(message.chat.id, jester)
-            jester_name = jester_name.user.first_name
+            try:
+                jester_name = await jr.get_chat_member(message.chat.id, jester)
+                jester_name = jester_name.user.first_name
+            except exceptions.InvalidUserId:
+                pass
             jester_mission_kb = types.InlineKeyboardMarkup()
             butt = types.InlineKeyboardButton('Задание для шута', callback_data='mission')
             jester_mission_kb.add(butt)
